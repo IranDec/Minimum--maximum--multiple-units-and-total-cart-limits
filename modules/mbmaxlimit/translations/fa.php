@@ -1,6 +1,8 @@
 <?php
 global $_MODULE;
 $_MODULE = array();
+
+// Existing translations from the user
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_4a0b8d3f0c9f'] = 'حداکثر تعداد هر محصول در سبد خرید';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_b4c6882d5d2a'] = 'محدود کردن تعداد سفارش برای برخی محصولات در هر سبد خرید';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_8f3a2b3b8a77'] = 'نگهداری';
@@ -20,3 +22,39 @@ $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_93cba07454f06a4a960172bbd6e2a435'] 
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_bafd7322c6e97d25b6299b5d6fe8920b'] = 'خیر';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_004bf6c9a40003140292e97330236c53'] = 'عملیات';
 
+// New translations added by Jules
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_2e43f1650342b55491122c61a5bcde25'] = 'توکن نامعتبر یا سطح دسترسی ناکافی است.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_1b0583a275b438692797e87413998851'] = 'رکوردهایی که مقدار حداکثر آنها صفر بود پاکسازی شدند.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_973142abe3d7a82894564c74986babd2'] = 'شناسه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_cd18f3a8785364379415a75dc942666d'] = 'محصول';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_25547c169942a5542778ba77a1192931'] = 'مرجع';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_3d34f07536968603d078a3c6f140de68'] = 'دامنه نامعتبر است.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_f3012935292a0e43838384643c70e17c'] = 'شناسه هدف یا مقدار حداکثر نامعتبر است.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_296435a33a3621430937a0519194e43e'] = 'شناسه دسته‌بندی، شناسه برند (تولید کننده)، شناسه کشور یا شناسه گروه مشتری';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_9498e995092f6946ae8b6a6d69a23991'] = 'فروشگاه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_11248c8b03a8904791e847c1b5634d93'] = 'همه فروشگاه‌ها';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_3d2ecac8093722f4625e1a10f75e2b26'] = 'حداکثر خرید در طول عمر برای مشتری';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_415664125301859c58d2a6a165b45f47'] = '0 = بدون محدودیت در طول عمر';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_358998c7e997f884518779973b881373'] = 'فعال از تاریخ';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_16d9526abb75052467d307779f451cf7'] = 'فعال تا تاریخ';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_f1a73379885d5621a9a231f2467e41b3'] = 'روزهای فعال هفته';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_36733234c83324671f54316828271a39'] = 'یکشنبه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6c8349cc92622646351d8b248a3d31aa'] = 'دوشنبه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_9594eec95be70e7b1710f730fdda33d9'] = 'سه‌شنبه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_c30c2598a313c0b7d38392178a2e4250'] = 'چهارشنبه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_b1d37e492131581b704f7a77e583a48e'] = 'پنج‌شنبه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6785160b9754f49487385ce3909c04eb'] = 'جمعه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_38851f8a84931a7f23c72e030386e881'] = 'شنبه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_7b8a729e16a8c62380a390185f409139'] = 'شناسه محصولات مستثنی (CSV)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_90b20a321915935a8f7c11f71a93e08f'] = 'شناسه دسته‌بندی‌های مستثنی (CSV)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_e4c36195c89c744f4f386b84fe77b47e'] = 'پیام سفارشی (انگلیسی)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_b841785f782a5789b7f508a8d1847a19'] = 'پیام سفارشی (فارسی)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_a9c92a6881c6eac75390768b5a034d28'] = 'فعال شده';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_49b5952f6b8e815610e7552554e20b8f'] = 'غیرفعال شده';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_a376d4d1e1837452d3c90714772b1156'] = 'افزودن قانون';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_e7559e21f2010839a8c64540d51375be'] = 'قوانین پیشرفته';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_63c32e542d8f9447a16e788880650965'] = 'حداکثر در طول عمر';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_53cf8c8502be90176465db26500c148c'] = 'از';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_d59a35e8557a73f8a49474775d73d4de'] = 'تا';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6d5062058356c1f59233e6f6345d045d'] = 'مشتری نمی‌تواند بیشتر از این تعداد از محصول را به سبد خرید اضافه کند (0 یعنی بدون محدودیت).';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_0756770fe3d837652c6f12015e5c84a8'] = 'فعال‌سازی محدودیت حداکثر برای این محصول';
