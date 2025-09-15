@@ -118,7 +118,7 @@ class Mbmaxlimit extends Module
 			if (!$this->isValidAdminToken() || !$this->employeeCan('delete')) {
 				return $this->displayError($this->l('Invalid token or insufficient permissions.'));
 			}
-			Db::getInstance()->execute('DELETE FROM `'._DB_PREFIX_.'mbmaxlimit_product` WHERE `max_qty` = 0');
+			Db::getInstance()->delete('mbmaxlimit_product', '`max_qty` = 0');
 			$output .= $this->displayConfirmation($this->l('Cleaned entries with zero max quantity.'));
 		}
 
@@ -567,18 +567,10 @@ class Mbmaxlimit extends Module
 		}
 	}
 
-	protected function computeEffectiveMaxQty($idProduct)
+	protected function _getExecutionContext($idProduct)
 	{
-		// Start from per-product limit if active
-		$productMax = 0;
-		if ($this->isProductLimitActive($idProduct)) {
-			$productMax = (int) $this->getProductMaxQty($idProduct);
-		}
-
-		$ruleMaxes = [];
 		$context = $this->context;
 		$idShop = (int) $context->shop->id;
-		$idLang = (int) $context->language->id;
 		$idCustomer = (int) $context->customer->id;
 		$idAddressDelivery = (int) $context->cart ? (int)$context->cart->id_address_delivery : 0;
 
@@ -597,6 +589,27 @@ class Mbmaxlimit extends Module
 		if ($idCustomer) {
 			$groupIds = Customer::getGroupsStatic($idCustomer);
 		}
+
+		return [
+			'idShop' => $idShop,
+			'idCustomer' => $idCustomer,
+			'manufacturerId' => $manufacturerId,
+			'categoryIds' => $categoryIds,
+			'countryId' => $countryId,
+			'groupIds' => $groupIds,
+		];
+	}
+
+	protected function computeEffectiveMaxQty($idProduct)
+	{
+		// Start from per-product limit if active
+		$productMax = 0;
+		if ($this->isProductLimitActive($idProduct)) {
+			$productMax = (int) $this->getProductMaxQty($idProduct);
+		}
+
+		$ruleMaxes = [];
+		extract($this->_getExecutionContext($idProduct));
 
 		// Fetch active rules
 		$rules = Db::getInstance()->executeS('SELECT * FROM `'._DB_PREFIX_.'mbmaxlimit_rule` WHERE active=1');
@@ -628,38 +641,32 @@ class Mbmaxlimit extends Module
 
 	protected function computeEffectiveLimit($idProduct)
 	{
-		$context = $this->context;
-		$idShop = (int) $context->shop->id;
-		$idCustomer = (int) $context->customer->id;
-		$idAddressDelivery = (int) $context->cart ? (int)$context->cart->id_address_delivery : 0;
+		// Get all contextual information (customer, shop, product groups, etc.)
+		extract($this->_getExecutionContext($idProduct));
 
-		$manufacturerId = (int) Db::getInstance()->getValue('SELECT `id_manufacturer` FROM `'._DB_PREFIX_.'product` WHERE id_product='.(int)$idProduct);
-		$categoryIds = array_map('intval', Product::getProductCategories((int)$idProduct));
-
-		$countryId = 0;
-		if ($idAddressDelivery) {
-			$address = new Address($idAddressDelivery);
-			if (Validate::isLoadedObject($address)) {
-				$countryId = (int) $address->id_country;
-			}
-		}
-
-		$groupIds = [];
-		if ($idCustomer) {
-			$groupIds = Customer::getGroupsStatic($idCustomer);
-		}
-
+		// Initialize with default values. bestMax=0 means no limit.
 		$bestMax = 0;
 		$bestRule = null;
 
+		// First, check if there is a specific limit set on the product page itself.
+		// This acts as a base limit.
 		if ($this->isProductLimitActive($idProduct)) {
 			$bestMax = (int) $this->getProductMaxQty($idProduct);
 		}
 
+		// Get all active advanced rules to find a potentially more restrictive limit.
 		$rules = Db::getInstance()->executeS('SELECT * FROM `'._DB_PREFIX_.'mbmaxlimit_rule` WHERE active=1');
 		foreach ($rules as $rule) {
-			if (!$this->ruleAppliesToContext($rule, $idShop)) { continue; }
-			if ($this->isProductExcludedByRule($rule, $idProduct, $categoryIds)) { continue; }
+			// Check if the rule is active based on date, day of week, and shop context.
+			if (!$this->ruleAppliesToContext($rule, $idShop)) {
+				continue;
+			}
+			// Check if the current product or its category is explicitly excluded by this rule.
+			if ($this->isProductExcludedByRule($rule, $idProduct, $categoryIds)) {
+				continue;
+			}
+
+			// Check if the rule's scope (category, brand, etc.) matches the current product and context.
 			$matches = false;
 			switch ($rule['scope']) {
 				case 'brand':
@@ -675,18 +682,27 @@ class Mbmaxlimit extends Module
 					$matches = (!empty($groupIds) && in_array((int)$rule['id_target'], array_map('intval', $groupIds), true));
 					break;
 			}
-			if (!$matches) { continue; }
+			if (!$matches) {
+				continue;
+			}
 
+			// The rule matches. Now, let's determine its effective max quantity.
 			$ruleMax = (int) $rule['max_qty'];
-			// Lifetime cap if defined and customer logged in
+
+			// If a lifetime limit is set for this rule and the customer is logged in,
+			// calculate the remaining allowed quantity.
 			if ($idCustomer && (int)$rule['lifetime_max_qty'] > 0) {
 				$purchased = $this->getLifetimePurchasedQty($idCustomer, (int)$idProduct, (int)$rule['id_shop']);
 				$remaining = max(0, (int)$rule['lifetime_max_qty'] - (int)$purchased);
+				// The effective limit is the minimum of the rule's cart limit and the remaining lifetime limit.
 				if ($remaining >= 0) {
 					$ruleMax = ($ruleMax > 0) ? min($ruleMax, $remaining) : $remaining;
 				}
 			}
 
+			// We are looking for the *most restrictive* (lowest) limit.
+			// If the current rule's limit is lower than the best one we've found so far,
+			// this rule becomes the new best one. A limit of 0 is ignored.
 			if ($ruleMax > 0) {
 				if ($bestMax === 0 || $ruleMax < $bestMax) {
 					$bestMax = $ruleMax;
@@ -695,6 +711,7 @@ class Mbmaxlimit extends Module
 			}
 		}
 
+		// Return the final calculated limit and the rule that caused it.
 		return [
 			'max' => (int) $bestMax,
 			'rule' => $bestRule,
@@ -803,13 +820,18 @@ class Mbmaxlimit extends Module
 		$maxQty = (int) max(0, (int)$maxQty);
 		$active = (int) ($active ? 1 : 0);
 
+		$data = [
+			'max_qty' => $maxQty,
+			'active' => $active,
+		];
+
 		$exists = (bool) Db::getInstance()->getValue('SELECT `id_product` FROM `'._DB_PREFIX_.'mbmaxlimit_product` WHERE `id_product`='.(int)$idProduct);
 		if ($exists) {
-			$sql = 'UPDATE `'._DB_PREFIX_.'mbmaxlimit_product` SET `max_qty`='.(int)$maxQty.', `active`='.(int)$active.' WHERE `id_product`='.(int)$idProduct;
+			return Db::getInstance()->update('mbmaxlimit_product', $data, 'id_product = '.(int)$idProduct);
 		} else {
-			$sql = 'INSERT INTO `'._DB_PREFIX_.'mbmaxlimit_product` (`id_product`, `max_qty`, `active`) VALUES ('.(int)$idProduct.', '.(int)$maxQty.', '.(int)$active.')';
+			$data['id_product'] = $idProduct;
+			return Db::getInstance()->insert('mbmaxlimit_product', $data);
 		}
-		return Db::getInstance()->execute($sql);
 	}
 }
 
