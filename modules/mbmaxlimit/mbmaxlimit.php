@@ -25,6 +25,7 @@ class Mbmaxlimit extends Module
 	{
 		return parent::install()
 			&& $this->installDb()
+			&& $this->installTabs()
 			&& $this->registerHook('actionProductFormBuilderModifier')
 			&& $this->registerHook('actionProductFormDataProvider')
 			&& $this->registerHook('actionAfterUpdateProductFormHandler')
@@ -34,7 +35,30 @@ class Mbmaxlimit extends Module
 
 	public function uninstall()
 	{
-		return $this->uninstallDb() && parent::uninstall();
+		return $this->uninstallTabs() && $this->uninstallDb() && parent::uninstall();
+	}
+	protected function installTabs()
+	{
+		$tab = new Tab();
+		$tab->active = 1;
+		$tab->class_name = 'AdminMbmaxlimitAjax';
+		$tab->name = [];
+		foreach (Language::getLanguages(false) as $lang) {
+			$tab->name[(int)$lang['id_lang']] = 'MB MaxLimit Ajax';
+		}
+		$tab->id_parent = (int) Tab::getIdFromClassName('AdminParentModulesSf');
+		$tab->module = $this->name;
+		return (bool) $tab->add();
+	}
+
+	protected function uninstallTabs()
+	{
+		$idTab = (int) Tab::getIdFromClassName('AdminMbmaxlimitAjax');
+		if ($idTab) {
+			$tab = new Tab($idTab);
+			return (bool) $tab->delete();
+		}
+		return true;
 	}
 
 	protected function installDb()
@@ -241,7 +265,7 @@ class Mbmaxlimit extends Module
 			$this->saveExclusionsCsv($idRule, 'product', $exProducts);
 			$this->saveExclusionsCsv($idRule, 'category', $exCategories);
 		}
-		if (Tools::isSubmit('deletemb_rule')) {
+		if (Tools::isSubmit('deletembmaxlimit_rule')) {
 			if (!$this->isValidAdminToken() || !$this->employeeCan('delete')) {
 				return $this->displayError($this->l('Invalid token or insufficient permissions.'));
 			}
@@ -410,6 +434,10 @@ class Mbmaxlimit extends Module
 			'active' => ['title' => $this->l('Active'), 'type' => 'bool'],
 		];
 
+		Media::addJsDef([
+			'mbmaxlimit_ajax_url' => $this->context->link->getAdminLink('AdminMbmaxlimitAjax')
+		]);
+		$this->context->controller->addJS($this->_path.'views/js/admin.js');
 		return $helper->generateForm([$fieldsForm]) . $hl->generateList($list, $fieldsList);
 	}
 
