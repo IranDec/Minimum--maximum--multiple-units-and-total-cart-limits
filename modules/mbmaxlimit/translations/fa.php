@@ -21,8 +21,6 @@ $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6e19c1b4a1c1'] = 'گروه مشتر
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_93cba07454f06a4a960172bbd6e2a435'] = 'بله';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_bafd7322c6e97d25b6299b5d6fe8920b'] = 'خیر';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_004bf6c9a40003140292e97330236c53'] = 'عملیات';
-
-// New translations added by Jules
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_2e43f1650342b55491122c61a5bcde25'] = 'توکن نامعتبر یا سطح دسترسی ناکافی است.';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_1b0583a275b438692797e87413998851'] = 'رکوردهایی که مقدار حداکثر آنها صفر بود پاکسازی شدند.';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_973142abe3d7a82894564c74986babd2'] = 'شناسه';
@@ -58,3 +56,10 @@ $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_53cf8c8502be90176465db26500c148c'] 
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_d59a35e8557a73f8a49474775d73d4de'] = 'تا';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6d5062058356c1f59233e6f6345d045d'] = 'مشتری نمی‌تواند بیشتر از این تعداد از محصول را به سبد خرید اضافه کند (0 یعنی بدون محدودیت).';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_0756770fe3d837652c6f12015e5c84a8'] = 'فعال‌سازی محدودیت حداکثر برای این محصول';
+
+// Version 2.0.0 translations
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_25555c2434297b83038597a4a4f101f3'] = 'محصول / ترکیب';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_f32388e25b18a1a433e387063063f283'] = 'مشتری نمی‌تواند بیشتر از این تعداد از محصول را به سبد خرید اضافه کند (0 یعنی بدون محدودیت). این محدودیت در صورتی که محدودیت خاصی برای ترکیب تعریف نشده باشد، برای کل محصول اعمال می‌شود.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_a388e5209773224796a4ed3805393112'] = 'حداکثر در هر سبد (این ترکیب)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_06c3a10404a331186f81a79f17045b8d'] = 'یک محدودیت مشخص برای این ترکیب تعریف کنید. این محدودیت، محدودیت اصلی محصول را لغو می‌کند. 0 = بدون محدودیت.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_26c42d9f45b882a8537a66b269894e63'] = 'فعال‌سازی محدودیت حداکثر برای این ترکیب';

@@ -9,7 +9,7 @@ class Mbmaxlimit extends Module
 	{
 		$this->name = 'mbmaxlimit';
 		$this->tab = 'checkout';
-		$this->version = '1.0.0';
+		$this->version = '2.0.0';
 		$this->author = 'Mohammad Babaei';
 		$this->need_instance = 0;
 		$this->ps_versions_compliancy = ['min' => '1.7.8.0', 'max' => _PS_VERSION_];
@@ -30,7 +30,12 @@ class Mbmaxlimit extends Module
 			&& $this->registerHook('actionProductFormDataProvider')
 			&& $this->registerHook('actionAfterUpdateProductFormHandler')
 			&& $this->registerHook('actionAfterCreateProductFormHandler')
-			&& $this->registerHook('actionCartUpdateQuantityBefore');
+			&& $this->registerHook('actionCartUpdateQuantityBefore')
+			// Hooks for combinations
+			&& $this->registerHook('actionProductCombinationFormBuilderModifier')
+			&& $this->registerHook('actionProductCombinationDataProvider')
+			&& $this->registerHook('actionAfterCreateCombination')
+			&& $this->registerHook('actionAfterUpdateCombination');
 	}
 
 	public function uninstall()
@@ -66,9 +71,10 @@ class Mbmaxlimit extends Module
 		$sql = [];
 		$sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'mbmaxlimit_product` (
 			`id_product` INT UNSIGNED NOT NULL,
+			`id_product_attribute` INT UNSIGNED NOT NULL DEFAULT 0,
 			`max_qty` INT UNSIGNED NOT NULL DEFAULT 0,
 			`active` TINYINT(1) NOT NULL DEFAULT 1,
-			PRIMARY KEY (`id_product`)
+			PRIMARY KEY (`id_product`, `id_product_attribute`)
 		) ENGINE='._MYSQL_ENGINE_.' DEFAULT CHARSET=utf8;';
 		$sql[] = 'CREATE TABLE IF NOT EXISTS `'._DB_PREFIX_.'mbmaxlimit_rule` (
 			`id_rule` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -170,13 +176,23 @@ class Mbmaxlimit extends Module
 	protected function renderList()
 	{
 		$products = $this->getLimitedProducts();
+		$id_lang = $this->context->language->id;
+
+		foreach ($products as &$product) {
+			if (!empty($product['id_product_attribute'])) {
+				$product['name'] = Product::getProductName($product['id_product'], $product['id_product_attribute'], $id_lang);
+			}
+			// Create a unique ID for the list helper since it doesn't support composite keys
+			$product['unique_id'] = $product['id_product'] . '-' . $product['id_product_attribute'];
+		}
+
 		$fieldsList = [
 			'id_product' => [
 				'title' => $this->l('ID'),
 				'type' => 'text',
 			],
 			'name' => [
-				'title' => $this->l('Product'),
+				'title' => $this->l('Product / Combination'),
 			],
 			'reference' => [
 				'title' => $this->l('Reference'),
@@ -187,6 +203,7 @@ class Mbmaxlimit extends Module
 			'active' => [
 				'title' => $this->l('Active'),
 				'type' => 'bool',
+				'callback' => 'printBool', // HelperList needs a callback for bool type
 			],
 		];
 
@@ -194,24 +211,34 @@ class Mbmaxlimit extends Module
 		$helper->shopLinkType = '';
 		$helper->simple_header = true;
 		$helper->listTotal = count($products);
-		$helper->identifier = 'id_product';
+		$helper->identifier = 'unique_id'; // Use the unique ID
 		$helper->actions = ['edit'];
 		$helper->show_toolbar = false;
 		$helper->module = $this;
 		$helper->title = $this->l('Products with maximum quantity limit');
-		$helper->table = 'mbmaxlimit_product';
+		$helper->table = 'mbmaxlimit_product'; // Table name for actions
 		$helper->token = Tools::getAdminTokenLite('AdminProducts');
-		$helper->currentIndex = $this->context->link->getAdminLink('AdminProducts');
+		// Link to the product page. The #tab-step3 anchor jumps to combinations tab.
+		$helper->currentIndex = $this->context->link->getAdminLink('AdminProducts') . '#tab-step3';
 
 		return $helper->generateList($products, $fieldsList);
 	}
 
+	// Helper function for the HelperList 'active' column
+	public function printBool($value, $row)
+	{
+		return $value ? $this->l('Yes') : $this->l('No');
+	}
+
 	protected function getLimitedProducts()
 	{
-		$sql = 'SELECT p.id_product, pl.name, p.reference, ml.max_qty, ml.active
+		$id_lang = (int)$this->context->language->id;
+		$id_shop = (int)$this->context->shop->id;
+		$sql = 'SELECT p.id_product, ml.id_product_attribute, pl.name, p.reference, ml.max_qty, ml.active
 			FROM `'._DB_PREFIX_.'mbmaxlimit_product` ml
 			INNER JOIN `'._DB_PREFIX_.'product` p ON (p.id_product = ml.id_product)
-			LEFT JOIN `'._DB_PREFIX_.'product_lang` pl ON (pl.id_product = p.id_product AND pl.id_lang='.(int)$this->context->language->id.' AND pl.id_shop='.(int)$this->context->shop->id.')
+			LEFT JOIN `'._DB_PREFIX_.'product_lang` pl ON (pl.id_product = p.id_product AND pl.id_lang='.$id_lang.' AND pl.id_shop='.$id_shop.')
+			WHERE ml.max_qty > 0
 			ORDER BY p.id_product DESC';
 		return Db::getInstance()->executeS($sql) ?: [];
 	}
@@ -474,36 +501,32 @@ class Mbmaxlimit extends Module
 	public function hookActionProductFormBuilderModifier(array $params)
 	{
 		$formBuilder = $params['form_builder'];
-		$data = $params['data'];
+		$idProduct = (int) $params['id'];
+		$limitData = $this->getProductLimitData($idProduct, 0);
 
-		$idProduct = (int) (isset($data['id_product']) ? $data['id_product'] : 0);
-		$maxQty = $this->getProductMaxQty($idProduct);
-		$active = $this->isProductLimitActive($idProduct);
-
-		// Use generic fields when Symfony types unavailable in context
 		$formBuilder->add('mbmaxlimit_max_qty', 'Symfony\Component\Form\Extension\Core\Type\IntegerType', [
 			'label' => $this->l('Maximum per cart'),
-			'help' => $this->l('Customer cannot add more than this quantity of the product to a cart (0 means no limit).'),
+			'help' => $this->l('Customer cannot add more than this quantity of the product to a cart (0 means no limit). This limit applies to the product as a whole if no combination-specific limit is set.'),
 			'required' => false,
-			'data' => $maxQty,
+			'data' => $limitData['max_qty'],
 			'empty_data' => 0,
-			'scale' => 0,
 			'attr' => ['min' => 0],
 		]);
 
 		$formBuilder->add('mbmaxlimit_active', 'Symfony\Component\Form\Extension\Core\Type\CheckboxType', [
 			'label' => $this->l('Enable max limit for this product'),
 			'required' => false,
-			'data' => $active,
+			'data' => (bool)$limitData['active'],
 		]);
 	}
 
 	public function hookActionProductFormDataProvider(array $params)
 	{
-		$idProduct = (int) (isset($params['id']) ? $params['id'] : 0);
+		$idProduct = (int) $params['id'];
+		$limitData = $this->getProductLimitData($idProduct, 0);
 		return [
-			'mbmaxlimit_max_qty' => $this->getProductMaxQty($idProduct),
-			'mbmaxlimit_active' => $this->isProductLimitActive($idProduct),
+			'mbmaxlimit_max_qty' => $limitData['max_qty'],
+			'mbmaxlimit_active' => (bool)$limitData['active'],
 		];
 	}
 
@@ -512,17 +535,66 @@ class Mbmaxlimit extends Module
 		$idProduct = (int) $params['id'];
 		$formData = $params['form_data'];
 		$maxQty = isset($formData['mbmaxlimit_max_qty']) ? (int)$formData['mbmaxlimit_max_qty'] : 0;
-		$active = !empty($formData['mbmaxlimit_active']) ? 1 : 0;
-		$this->saveProductLimit($idProduct, $maxQty, $active);
+		$active = !empty($formData['mbmaxlimit_active']);
+		$this->saveProductLimit($idProduct, 0, $maxQty, $active);
 	}
 
 	public function hookActionAfterCreateProductFormHandler(array $params)
 	{
-		$idProduct = (int) $params['id'];
+		$this->hookActionAfterUpdateProductFormHandler($params);
+	}
+
+	public function hookActionProductCombinationFormBuilderModifier(array $params)
+	{
+		$formBuilder = $params['form_builder'];
+		$idProduct = (int) Tools::getValue('id_product');
+		$idProductAttribute = (int) $params['id'];
+		$limitData = $this->getProductLimitData($idProduct, $idProductAttribute);
+
+		$formBuilder->add('mbmaxlimit_max_qty_kombi', 'Symfony\Component\Form\Extension\Core\Type\IntegerType', [
+			'label' => $this->l('Maximum per cart (this combination)'),
+			'help' => $this->l('Set a specific limit for this combination. Overrides the main product limit. 0 = no limit.'),
+			'required' => false,
+			'data' => $limitData['max_qty'],
+			'empty_data' => 0,
+			'attr' => ['min' => 0],
+		]);
+		$formBuilder->add('mbmaxlimit_active_kombi', 'Symfony\Component\Form\Extension\Core\Type\CheckboxType', [
+			'label' => $this->l('Enable max limit for this combination'),
+			'required' => false,
+			'data' => (bool)$limitData['active'],
+		]);
+	}
+
+	public function hookActionProductCombinationDataProvider(array $params)
+	{
+		$idProduct = (int) Tools::getValue('id_product');
+		$idProductAttribute = (int) $params['id'];
+		$limitData = $this->getProductLimitData($idProduct, $idProductAttribute);
+		return [
+			'mbmaxlimit_max_qty_kombi' => $limitData['max_qty'],
+			'mbmaxlimit_active_kombi' => (bool)$limitData['active'],
+		];
+	}
+
+	public function hookActionAfterUpdateCombination(array $params)
+	{
+		$idProduct = (int) Tools::getValue('id_product');
+		$idProductAttribute = (int) $params['id_product_attribute'];
 		$formData = $params['form_data'];
-		$maxQty = isset($formData['mbmaxlimit_max_qty']) ? (int)$formData['mbmaxlimit_max_qty'] : 0;
-		$active = !empty($formData['mbmaxlimit_active']) ? 1 : 0;
-		$this->saveProductLimit($idProduct, $maxQty, $active);
+		$maxQty = isset($formData['mbmaxlimit_max_qty_kombi']) ? (int)$formData['mbmaxlimit_max_qty_kombi'] : 0;
+		$active = !empty($formData['mbmaxlimit_active_kombi']);
+		$this->saveProductLimit($idProduct, $idProductAttribute, $maxQty, $active);
+	}
+
+	public function hookActionAfterCreateCombination(array $params)
+	{
+		// id_product_attribute is not available in create context, need to get it from the newly created combination
+		$idProductAttribute = (int) $params['id_product_attribute'];
+		// Also need to get id_product from the request
+		$idProduct = (int) Tools::getValue('id_product');
+		$params['id_product_attribute'] = $idProductAttribute; // ensure it's in params for the handler
+		$this->hookActionAfterUpdateCombination($params);
 	}
 
 	public function hookActionCartUpdateQuantityBefore(array &$params)
@@ -532,7 +604,7 @@ class Mbmaxlimit extends Module
 		$op = isset($params['operator']) ? $params['operator'] : 'up';
 		$delta = (int) $params['quantity'];
 
-		$limit = $this->computeEffectiveLimit($idProduct);
+		$limit = $this->computeEffectiveLimit($idProduct, $idProductAttribute);
 		$max = (int) $limit['max'];
 		if ($max <= 0) {
 			return;
@@ -563,7 +635,6 @@ class Mbmaxlimit extends Module
 			$params['quantity'] = max(0, $max - $currentQty);
 			$message = $this->buildLimitMessage($limit, $max);
 			$this->context->controller->errors[] = $message;
-			// For AJAX add-to-cart, provide translated message via front controller if available
 		}
 	}
 
@@ -600,73 +671,38 @@ class Mbmaxlimit extends Module
 		];
 	}
 
-	protected function computeEffectiveMaxQty($idProduct)
+	protected function computeEffectiveLimit($idProduct, $idProductAttribute)
 	{
-		// Start from per-product limit if active
-		$productMax = 0;
-		if ($this->isProductLimitActive($idProduct)) {
-			$productMax = (int) $this->getProductMaxQty($idProduct);
-		}
-
-		$ruleMaxes = [];
 		extract($this->_getExecutionContext($idProduct));
 
-		// Fetch active rules
-		$rules = Db::getInstance()->executeS('SELECT * FROM `'._DB_PREFIX_.'mbmaxlimit_rule` WHERE active=1');
-		foreach ($rules as $rule) {
-			if (!$this->ruleAppliesToContext($rule, $idShop)) { continue; }
-			if ($this->isProductExcludedByRule($rule, $idProduct, $categoryIds)) { continue; }
-			switch ($rule['scope']) {
-				case 'brand':
-					if ($manufacturerId && (int)$rule['id_target'] === $manufacturerId) { $ruleMaxes[] = (int)$rule['max_qty']; }
-					break;
-				case 'category':
-					if (!empty($categoryIds) && in_array((int)$rule['id_target'], $categoryIds, true)) { $ruleMaxes[] = (int)$rule['max_qty']; }
-					break;
-				case 'country':
-					if ($countryId && (int)$rule['id_target'] === $countryId) { $ruleMaxes[] = (int)$rule['max_qty']; }
-					break;
-				case 'customer_group':
-					if (!empty($groupIds) && in_array((int)$rule['id_target'], array_map('intval', $groupIds), true)) { $ruleMaxes[] = (int)$rule['max_qty']; }
-					break;
-			}
-		}
-
-		$all = array_filter(array_merge([$productMax], $ruleMaxes), function($v){ return (int)$v > 0; });
-		if (empty($all)) {
-			return 0;
-		}
-		return (int) min($all);
-	}
-
-	protected function computeEffectiveLimit($idProduct)
-	{
-		// Get all contextual information (customer, shop, product groups, etc.)
-		extract($this->_getExecutionContext($idProduct));
-
-		// Initialize with default values. bestMax=0 means no limit.
 		$bestMax = 0;
 		$bestRule = null;
 
-		// First, check if there is a specific limit set on the product page itself.
-		// This acts as a base limit.
-		if ($this->isProductLimitActive($idProduct)) {
-			$bestMax = (int) $this->getProductMaxQty($idProduct);
+		// 1. Check for a specific, active limit on the combination itself.
+		if ($idProductAttribute > 0) {
+			$limitData = $this->getProductLimitData($idProduct, $idProductAttribute);
+			if ($limitData['active'] && $limitData['max_qty'] > 0) {
+				$bestMax = $limitData['max_qty'];
+			}
 		}
 
-		// Get all active advanced rules to find a potentially more restrictive limit.
+		// 2. If no combination-specific limit is found, check for a limit on the main product.
+		if ($bestMax === 0) {
+			$limitData = $this->getProductLimitData($idProduct, 0);
+			if ($limitData['active'] && $limitData['max_qty'] > 0) {
+				$bestMax = $limitData['max_qty'];
+			}
+		}
+
 		$rules = Db::getInstance()->executeS('SELECT * FROM `'._DB_PREFIX_.'mbmaxlimit_rule` WHERE active=1');
 		foreach ($rules as $rule) {
-			// Check if the rule is active based on date, day of week, and shop context.
 			if (!$this->ruleAppliesToContext($rule, $idShop)) {
 				continue;
 			}
-			// Check if the current product or its category is explicitly excluded by this rule.
 			if ($this->isProductExcludedByRule($rule, $idProduct, $categoryIds)) {
 				continue;
 			}
 
-			// Check if the rule's scope (category, brand, etc.) matches the current product and context.
 			$matches = false;
 			switch ($rule['scope']) {
 				case 'brand':
@@ -686,23 +722,15 @@ class Mbmaxlimit extends Module
 				continue;
 			}
 
-			// The rule matches. Now, let's determine its effective max quantity.
 			$ruleMax = (int) $rule['max_qty'];
-
-			// If a lifetime limit is set for this rule and the customer is logged in,
-			// calculate the remaining allowed quantity.
 			if ($idCustomer && (int)$rule['lifetime_max_qty'] > 0) {
 				$purchased = $this->getLifetimePurchasedQty($idCustomer, (int)$idProduct, (int)$rule['id_shop']);
 				$remaining = max(0, (int)$rule['lifetime_max_qty'] - (int)$purchased);
-				// The effective limit is the minimum of the rule's cart limit and the remaining lifetime limit.
 				if ($remaining >= 0) {
 					$ruleMax = ($ruleMax > 0) ? min($ruleMax, $remaining) : $remaining;
 				}
 			}
 
-			// We are looking for the *most restrictive* (lowest) limit.
-			// If the current rule's limit is lower than the best one we've found so far,
-			// this rule becomes the new best one. A limit of 0 is ignored.
 			if ($ruleMax > 0) {
 				if ($bestMax === 0 || $ruleMax < $bestMax) {
 					$bestMax = $ruleMax;
@@ -711,7 +739,6 @@ class Mbmaxlimit extends Module
 			}
 		}
 
-		// Return the final calculated limit and the rule that caused it.
 		return [
 			'max' => (int) $bestMax,
 			'rule' => $bestRule,
@@ -794,44 +821,28 @@ class Mbmaxlimit extends Module
 		}
 	}
 
-	protected function getProductMaxQty($idProduct)
+	protected function getProductLimitData($idProduct, $idProductAttribute)
 	{
-		if (!$idProduct) {
-			return 0;
+		$row = Db::getInstance()->getRow(
+			'SELECT `max_qty`, `active` FROM `'._DB_PREFIX_.'mbmaxlimit_product`
+			WHERE `id_product`='.(int)$idProduct.' AND `id_product_attribute`='.(int)$idProductAttribute
+		);
+		if (!$row) {
+			return ['max_qty' => 0, 'active' => false];
 		}
-		$sql = 'SELECT `max_qty` FROM `'._DB_PREFIX_.'mbmaxlimit_product` WHERE `id_product`='.(int)$idProduct.' AND `active`=1';
-		$value = Db::getInstance()->getValue($sql);
-		return (int) $value;
+		return ['max_qty' => (int)$row['max_qty'], 'active' => (bool)$row['active']];
 	}
 
-	protected function isProductLimitActive($idProduct)
+	protected function saveProductLimit($idProduct, $idProductAttribute, $maxQty, $active)
 	{
-		if (!$idProduct) {
-			return false;
-		}
-		$sql = 'SELECT `active` FROM `'._DB_PREFIX_.'mbmaxlimit_product` WHERE `id_product`='.(int)$idProduct;
-		$value = Db::getInstance()->getValue($sql);
-		return (bool) $value;
-	}
-
-	protected function saveProductLimit($idProduct, $maxQty, $active)
-	{
-		$idProduct = (int) $idProduct;
-		$maxQty = (int) max(0, (int)$maxQty);
-		$active = (int) ($active ? 1 : 0);
-
 		$data = [
-			'max_qty' => $maxQty,
-			'active' => $active,
+			'id_product' => (int)$idProduct,
+			'id_product_attribute' => (int)$idProductAttribute,
+			'max_qty' => (int)max(0, $maxQty),
+			'active' => (int)$active,
 		];
 
-		$exists = (bool) Db::getInstance()->getValue('SELECT `id_product` FROM `'._DB_PREFIX_.'mbmaxlimit_product` WHERE `id_product`='.(int)$idProduct);
-		if ($exists) {
-			return Db::getInstance()->update('mbmaxlimit_product', $data, 'id_product = '.(int)$idProduct);
-		} else {
-			$data['id_product'] = $idProduct;
-			return Db::getInstance()->insert('mbmaxlimit_product', $data);
-		}
+		return Db::getInstance()->insert('mbmaxlimit_product', $data, false, true, Db::REPLACE);
 	}
 }
 
