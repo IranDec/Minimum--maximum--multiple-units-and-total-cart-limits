@@ -56,10 +56,47 @@ $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_53cf8c8502be90176465db26500c148c'] 
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_d59a35e8557a73f8a49474775d73d4de'] = 'تا';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6d5062058356c1f59233e6f6345d045d'] = 'مشتری نمی‌تواند بیشتر از این تعداد از محصول را به سبد خرید اضافه کند (0 یعنی بدون محدودیت).';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_0756770fe3d837652c6f12015e5c84a8'] = 'فعال‌سازی محدودیت حداکثر برای این محصول';
-
-// Version 2.0.0 translations
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_25555c2434297b83038597a4a4f101f3'] = 'محصول / ترکیب';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_f32388e25b18a1a433e387063063f283'] = 'مشتری نمی‌تواند بیشتر از این تعداد از محصول را به سبد خرید اضافه کند (0 یعنی بدون محدودیت). این محدودیت در صورتی که محدودیت خاصی برای ترکیب تعریف نشده باشد، برای کل محصول اعمال می‌شود.';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_a388e5209773224796a4ed3805393112'] = 'حداکثر در هر سبد (این ترکیب)';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_06c3a10404a331186f81a79f17045b8d'] = 'یک محدودیت مشخص برای این ترکیب تعریف کنید. این محدودیت، محدودیت اصلی محصول را لغو می‌کند. 0 = بدون محدودیت.';
 $_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_26c42d9f45b882a8537a66b269894e63'] = 'فعال‌سازی محدودیت حداکثر برای این ترکیب';
+// Global settings
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_b023b9d0d3a0e1d6d5a4a5b4c4e8a4d4'] = 'تنظیمات سراسری';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_f284d3c6fd8b5b54d336a5b172a3928e'] = 'تعداد حداکثر پیش‌فرض';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_3e51d9745585a7e6b0109968b6b15802'] = 'این محدودیت برای تمام محصولات اعمال می‌شود مگر اینکه محدودیت خاص‌تری (روی محصول، ترکیب یا از طریق قانون) تعیین شده باشد. 0 یعنی هیچ محدودیت سراسری وجود ندارد.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_c9cc8cce247e49bae79f15173ce97354'] = 'ذخیره';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_6344766e432a58d119a79564a514589d'] = 'تنظیمات سراسری به‌روز شد.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_d38c6f6d507c3e726915e7145719339e'] = 'مقدار نامعتبر برای تعداد حداکثر پیش‌فرض.';
+// Time frame settings
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_9c1997323340b9c32ed76e1919865660'] = 'حداکثر خرید در بازه زمانی';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_5c37854de5472851147593c6e9490e48'] = 'حداکثر تعداد خریدی که مشتری می‌تواند در بازه زمانی مشخص شده انجام دهد را تعیین کنید. 0 = بدون محدودیت.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_3e335439a847974488219460010373e2'] = 'بازه زمانی';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_00d898c2d1519a557de20e3663124844'] = 'برای همیشه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_9b1584e8579d20165576a47a19530431'] = 'در روز (۲۴ ساعت گذشته)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_87f9f33c94f1eb6b20894ab4713c7a72'] = 'در هفته (۷ روز گذشته)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_c2e269784335c6e31718128362615467'] = 'در ماه (۳۰ روز گذشته)';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_1f6294e78bce4d6a695e54d5861de8e3'] = 'بازه زمانی که محدودیت خرید در آن اعمال می‌شود.';
+// Feature rule
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_3244de15b94e364003c6c026a29739d4'] = 'ویژگی محصول';
+// Bulk Actions
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_c9a3bf8b9c504b50d3b6f0e633d36b85'] = 'عملیات انبوه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_d6741762464e3c0383111f1854965157'] = 'دسته‌بندی‌ها';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_26b548b29154f85e92d24263625d8cae'] = 'عملیات را روی تمام محصولات دسته‌بندی‌های انتخاب شده اعمال کنید.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_004bf6c9a40003140292e97330236c53'] = 'عملیات';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_0494605455324678807c4d5a812e9b89'] = 'افزودن / به‌روزرسانی محدودیت';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_e979e953fe304b5a31a89c9e883a45a3'] = 'حذف محدودیت';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_9d34159654261751d3862283a0429188'] = 'حداکثر تعداد';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_a384c7e7380c5504780514101e40c557'] = 'تعداد را برای عملیات "افزودن/به‌روزرسانی" تنظیم کنید. برای "حذف" نادیده گرفته می‌شود.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_93c651f8933479a408e046a694669864'] = 'اعمال عملیات انبوه';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_b0183492e811f58448f21c27c6cd08d4'] = 'شما باید حداقل یک دسته‌بندی را انتخاب کنید.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_e70b343383a884615a1f269d0c27387d'] = 'مقدار حداکثر باید یک عدد مثبت برای عملیات افزودن/به‌روزرسانی باشد.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_65d71597813a359733526017e29a9979'] = 'عملیات انبوه کامل شد. %d محصول تحت تأثیر قرار گرفت.';
+// Frontend display
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_431f45341203b1022c42337e06183e9b'] = 'نمایش تعداد قابل خرید';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_48443914e6801a61358321d454d49e1a'] = 'نمایش یک پیام در صفحه محصول که به مشتری نشان می‌دهد چه تعداد دیگر از کالا را می‌تواند خریداری کند.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_2e804a3970b8a37c959779350431351e'] = 'شما به حد مجاز خرید برای این کالا رسیده‌اید.';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_56a644262d8477de144e3e3b5635f79a'] = 'شما می‌توانید %d عدد دیگر از این کالا به سبد خرید خود اضافه کنید.';
+// Modal
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_c2a9563945486e685919623e1d6d713c'] = 'استفاده از پاپ‌آپ مودال برای خطاها';
+$_MODULE['<{mbmaxlimit}prestashop>mbmaxlimit_47b599395a155543160e181820658428'] = 'هنگامی که محدودیتی اعمال می‌شود، به جای اعلان پیش‌فرض بالای صفحه، یک پاپ‌آپ مودال نمایش داده شود.';

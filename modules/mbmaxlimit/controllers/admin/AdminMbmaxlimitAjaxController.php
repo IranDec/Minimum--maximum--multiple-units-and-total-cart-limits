@@ -38,6 +38,9 @@ class AdminMbmaxlimitAjaxController extends ModuleAdminController
 			case 'customer_group':
 				$rows = Db::getInstance()->executeS('SELECT g.id_group as id, gl.name as name FROM `'._DB_PREFIX_.'group` g INNER JOIN `'._DB_PREFIX_.'group_lang` gl ON (gl.id_group=g.id_group AND gl.id_lang='.(int)$this->context->language->id.') WHERE gl.name LIKE \'%'.pSQL($term).'%\' ORDER BY gl.name LIMIT 20');
 				break;
+			case 'feature':
+				$rows = Db::getInstance()->executeS('SELECT f.id_feature as id, fl.name as name FROM `'._DB_PREFIX_.'feature` f INNER JOIN `'._DB_PREFIX_.'feature_lang` fl ON (fl.id_feature=f.id_feature AND fl.id_lang='.(int)$this->context->language->id.') WHERE fl.name LIKE \'%'.pSQL($term).'%\' ORDER BY fl.name LIMIT 20');
+				break;
 			default:
 				$rows = [];
 		}
