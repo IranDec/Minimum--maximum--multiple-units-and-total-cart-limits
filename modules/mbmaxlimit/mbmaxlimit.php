@@ -9,7 +9,7 @@ class Mbmaxlimit extends Module
 	{
 		$this->name = 'mbmaxlimit';
 		$this->tab = 'checkout';
-		$this->version = '2.0.0';
+		$this->version = '2.1.0';
 		$this->author = 'Mohammad Babaei';
 		$this->need_instance = 0;
 		$this->ps_versions_compliancy = ['min' => '1.7.8.0', 'max' => _PS_VERSION_];
@@ -35,7 +35,11 @@ class Mbmaxlimit extends Module
 			&& $this->registerHook('actionProductCombinationFormBuilderModifier')
 			&& $this->registerHook('actionProductCombinationDataProvider')
 			&& $this->registerHook('actionAfterCreateCombination')
-			&& $this->registerHook('actionAfterUpdateCombination');
+			&& $this->registerHook('actionAfterUpdateCombination')
+			// Hooks for frontend display
+			&& $this->registerHook('displayProductAdditionalInfo')
+			&& $this->registerHook('actionFrontControllerSetMedia')
+			&& $this->registerHook('actionProductRefresh');
 	}
 
 	public function uninstall()
@@ -86,6 +90,7 @@ class Mbmaxlimit extends Module
 			`date_from` DATETIME NULL,
 			`date_to` DATETIME NULL,
 			`dow_mask` TINYINT UNSIGNED NOT NULL DEFAULT 127,
+			`time_frame` VARCHAR(32) NOT NULL DEFAULT 'all_time',
 			`lifetime_max_qty` INT UNSIGNED NOT NULL DEFAULT 0,
 			`message_en` VARCHAR(255) NULL,
 			`message_fa` VARCHAR(255) NULL,
@@ -120,30 +125,191 @@ class Mbmaxlimit extends Module
 	public function getContent()
 	{
 		$output = '';
-		if (Tools::isSubmit('submit_mbmaxlimit_clean')) {
+		// Handle form submissions first
+		if (Tools::isSubmit('submit_mbmaxlimit_global')) {
+			if (!$this->isValidAdminToken() || !$this->employeeCan('edit')) {
+				return $this->displayError($this->l('Invalid token or insufficient permissions.'));
+			}
+			$globalMax = Tools::getValue('MBMAXLIMIT_GLOBAL_MAX_QTY');
+			$showRemaining = Tools::getValue('MBMAXLIMIT_SHOW_REMAINING');
+			$useModal = Tools::getValue('MBMAXLIMIT_USE_MODAL');
+
+			if (!Validate::isUnsignedInt($globalMax)) {
+				$output .= $this->displayError($this->l('Invalid value for default maximum quantity.'));
+			} else {
+				Configuration::updateValue('MBMAXLIMIT_GLOBAL_MAX_QTY', (int)$globalMax);
+				Configuration::updateValue('MBMAXLIMIT_SHOW_REMAINING', (bool)$showRemaining);
+				Configuration::updateValue('MBMAXLIMIT_USE_MODAL', (bool)$useModal);
+				$output .= $this->displayConfirmation($this->l('Global settings updated.'));
+			}
+		} elseif (Tools::isSubmit('submit_mbmaxlimit_clean')) {
 			if (!$this->isValidAdminToken() || !$this->employeeCan('delete')) {
 				return $this->displayError($this->l('Invalid token or insufficient permissions.'));
 			}
 			Db::getInstance()->delete('mbmaxlimit_product', '`max_qty` = 0');
 			$output .= $this->displayConfirmation($this->l('Cleaned entries with zero max quantity.'));
+		} elseif (Tools::isSubmit('submit_mbmaxlimit_bulk')) {
+			if (!$this->isValidAdminToken() || !$this->employeeCan('edit')) {
+				return $this->displayError($this->l('Invalid token or insufficient permissions.'));
+			}
+			$categories = Tools::getValue('category_box');
+			if (empty($categories)) {
+				$output .= $this->displayError($this->l('You must select at least one category.'));
+			} else {
+				$action = Tools::getValue('bulk_action');
+				$maxQty = (int)Tools::getValue('bulk_max_qty');
+
+				if ($action === 'add_update' && $maxQty <= 0) {
+					$output .= $this->displayError($this->l('Max quantity must be a positive number for the add/update action.'));
+				} else {
+					$productIds = $this->getProductsInCategories($categories);
+					$count = 0;
+					foreach ($productIds as $id_product) {
+						if ($action === 'add_update') {
+							$this->saveProductLimit($id_product, 0, $maxQty, true);
+							$count++;
+						} elseif ($action === 'remove') {
+							$this->removeProductLimit($id_product, 0);
+							$count++;
+						}
+					}
+					$output .= $this->displayConfirmation(sprintf($this->l('Bulk action completed. %d products affected.'), $count));
+				}
+			}
 		}
 
-		$output .= $this->renderAuthorBlock();
-		$output .= $this->renderList();
-		$output .= $this->handleAndRenderRules();
-		$output .= $this->renderActions();
-		return $output;
+		// Assign rendered forms and lists to Smarty
+		$this->context->smarty->assign([
+			'global_settings_form' => $this->renderGlobalLimitForm(),
+			'bulk_actions_form' => $this->renderBulkActionsForm(),
+			'advanced_rules_form' => $this->handleAndRenderRules(),
+			'limited_products_list' => $this->renderList(),
+			'maintenance_form' => $this->renderActions(),
+		]);
+
+		// Fetch the custom template
+		return $output . $this->display(__FILE__, 'views/templates/admin/configure.tpl');
 	}
 
-	protected function renderAuthorBlock()
+	protected function renderGlobalLimitForm()
 	{
-		$tpl = $this->context->smarty->createTemplate(_PS_MODULE_DIR_.$this->name.'/views/templates/admin/author.tpl');
-		$tpl->assign([
-			'module_display_name' => $this->displayName,
-			'author_name' => 'Mohammad Babaei',
-			'author_site' => 'https://adschi.com',
-		]);
-		return $tpl->fetch();
+		$helper = new HelperForm();
+		$helper->module = $this;
+		$helper->token = Tools::getAdminTokenLite('AdminModules');
+		$helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
+		$helper->submit_action = 'submit_mbmaxlimit_global';
+		$helper->show_toolbar = false;
+
+		$helper->fields_value['MBMAXLIMIT_GLOBAL_MAX_QTY'] = Configuration::get('MBMAXLIMIT_GLOBAL_MAX_QTY');
+		$helper->fields_value['MBMAXLIMIT_SHOW_REMAINING'] = Configuration::get('MBMAXLIMIT_SHOW_REMAINING');
+		$helper->fields_value['MBMAXLIMIT_USE_MODAL'] = Configuration::get('MBMAXLIMIT_USE_MODAL');
+
+		$fieldsForm = [
+			'form' => [
+				'legend' => [
+					'title' => $this->l('Global Settings'),
+				],
+				'input' => [
+					[
+						'type' => 'text',
+						'label' => $this->l('Default maximum quantity'),
+						'name' => 'MBMAXLIMIT_GLOBAL_MAX_QTY',
+						'desc' => $this->l('This limit applies to all products unless a more specific limit (on product, combination, or by rule) is set. 0 means no global limit.'),
+						'class' => 'input fixed-width-sm',
+					],
+					[
+						'type' => 'switch',
+						'label' => $this->l('Display remaining quantity'),
+						'name' => 'MBMAXLIMIT_SHOW_REMAINING',
+						'is_bool' => true,
+						'values' => [
+							['id' => 'active_on', 'value' => 1, 'label' => $this->l('Enabled')],
+							['id' => 'active_off', 'value' => 0, 'label' => $this->l('Disabled')],
+						],
+						'desc' => $this->l('Show a message on the product page indicating how many more units the customer can buy.'),
+					],
+					[
+						'type' => 'switch',
+						'label' => $this->l('Use modal popups for errors'),
+						'name' => 'MBMAXLIMIT_USE_MODAL',
+						'is_bool' => true,
+						'values' => [
+							['id' => 'active_on', 'value' => 1, 'label' => $this->l('Enabled')],
+							['id' => 'active_off', 'value' => 0, 'label' => $this->l('Disabled')],
+						],
+						'desc' => $this->l('When a limit is reached, show a modal popup instead of the default top-page notification.'),
+					],
+				],
+				'submit' => [
+					'title' => $this->l('Save'),
+				],
+			],
+		];
+
+		return $helper->generateForm([$fieldsForm]);
+	}
+
+	protected function renderBulkActionsForm()
+	{
+		$helper = new HelperForm();
+		$helper->module = $this;
+		$helper->token = Tools::getAdminTokenLite('AdminModules');
+		$helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
+		$helper->submit_action = 'submit_mbmaxlimit_bulk';
+
+		$root = Category::getRootCategory();
+		$tree = new HelperTreeCategories('bulk-categories-tree', $this->l('Categories'));
+		$tree->setUseCheckBox(true)->setFullTree(true);
+
+		$fieldsForm = [
+			'form' => [
+				'legend' => [
+					'title' => $this->l('Bulk Actions'),
+					'icon' => 'icon-tasks',
+				],
+				'input' => [
+					[
+						'type' => 'categories',
+						'label' => $this->l('Categories'),
+						'name' => 'category_box',
+						'tree' => [
+							'id' => 'bulk-categories-tree',
+							'selected_categories' => Tools::getValue('category_box', []),
+							'root_category' => $root->id,
+							'use_search' => true,
+							'use_checkbox' => true,
+						],
+						'desc' => $this->l('Apply action to all products in the selected categories.'),
+					],
+					[
+						'type' => 'select',
+						'label' => $this->l('Action'),
+						'name' => 'bulk_action',
+						'options' => [
+							'query' => [
+								['id' => 'add_update', 'name' => $this->l('Add / Update Limit')],
+								['id' => 'remove', 'name' => $this->l('Remove Limit')],
+							],
+							'id' => 'id',
+							'name' => 'name',
+						],
+					],
+					[
+						'type' => 'text',
+						'label' => $this->l('Max Quantity'),
+						'name' => 'bulk_max_qty',
+						'class' => 'input fixed-width-sm',
+						'desc' => $this->l('Set the quantity for the "Add/Update" action. Ignored for "Remove".'),
+					],
+				],
+				'submit' => [
+					'title' => $this->l('Apply Bulk Action'),
+					'class' => 'btn btn-default pull-right',
+				],
+			],
+		];
+
+		return $helper->generateForm([$fieldsForm]);
 	}
 
 	protected function renderActions()
@@ -251,7 +417,7 @@ class Mbmaxlimit extends Module
 				return $this->displayError($this->l('Invalid token or insufficient permissions.'));
 			}
 			$scope = Tools::getValue('mb_scope');
-			$allowedScopes = ['category','brand','country','customer_group'];
+			$allowedScopes = ['category','brand','country','customer_group', 'feature'];
 			if (!in_array($scope, $allowedScopes, true)) {
 				return $this->displayError($this->l('Invalid scope.'));
 			}
@@ -267,6 +433,7 @@ class Mbmaxlimit extends Module
 				foreach ($dow as $d) { $d = (int)$d; if ($d >= 0 && $d <= 6) { $dowMask |= (1 << $d); } }
 			}
 			$lifetimeMax = (int) Tools::getValue('mb_lifetime_max');
+			$timeFrame = Tools::getValue('mb_time_frame', 'all_time');
 			$msgEn = Tools::getValue('mb_message_en');
 			$msgFa = Tools::getValue('mb_message_fa');
 			if ($idTarget <= 0 || $max < 0) {
@@ -281,6 +448,7 @@ class Mbmaxlimit extends Module
 				'date_from' => $dateFrom ? pSQL($dateFrom) : null,
 				'date_to' => $dateTo ? pSQL($dateTo) : null,
 				'dow_mask' => (int)$dowMask,
+				'time_frame' => pSQL($timeFrame),
 				'lifetime_max_qty' => (int)$lifetimeMax,
 				'message_en' => $msgEn ? pSQL($msgEn) : null,
 				'message_fa' => $msgFa ? pSQL($msgFa) : null,
@@ -339,6 +507,7 @@ class Mbmaxlimit extends Module
 								['id' => 'brand', 'name' => $this->l('Brand')],
 								['id' => 'country', 'name' => $this->l('Country')],
 								['id' => 'customer_group', 'name' => $this->l('Customer group')],
+								['id' => 'feature', 'name' => $this->l('Product Feature')],
 							],
 							'id' => 'id',
 							'name' => 'name',
@@ -365,9 +534,27 @@ class Mbmaxlimit extends Module
 					],
 					[
 						'type' => 'text',
-						'label' => $this->l('Lifetime max per customer'),
+						'label' => $this->l('Max purchases per time frame'),
 						'name' => 'mb_lifetime_max',
-						'desc' => $this->l('0 = no lifetime limit'),
+						'desc' => $this->l('Set the maximum number of times a customer can purchase products matching this rule. 0 = no limit.'),
+						'col' => 4,
+					],
+					[
+						'type' => 'select',
+						'label' => $this->l('Time Frame'),
+						'name' => 'mb_time_frame',
+						'options' => [
+							'query' => [
+								['id' => 'all_time', 'name' => $this->l('All Time')],
+								['id' => 'daily', 'name' => $this->l('Per Day (last 24 hours)')],
+								['id' => 'weekly', 'name' => $this->l('Per Week (last 7 days)')],
+								['id' => 'monthly', 'name' => $this->l('Per Month (last 30 days)')],
+							],
+							'id' => 'id',
+							'name' => 'name',
+						],
+						'desc' => $this->l('The time period over which the purchase limit is enforced.'),
+						'col' => 4,
 					],
 					[
 						'type' => 'date',
@@ -455,6 +642,7 @@ class Mbmaxlimit extends Module
 			'id_target' => ['title' => $this->l('Target ID')],
 			'max_qty' => ['title' => $this->l('Max per cart')],
 			'lifetime_max_qty' => ['title' => $this->l('Lifetime max')],
+			'time_frame' => ['title' => $this->l('Time Frame')],
 			'id_shop' => ['title' => $this->l('Shop')],
 			'date_from' => ['title' => $this->l('From')],
 			'date_to' => ['title' => $this->l('To')],
@@ -511,12 +699,14 @@ class Mbmaxlimit extends Module
 			'data' => $limitData['max_qty'],
 			'empty_data' => 0,
 			'attr' => ['min' => 0],
+			'form_tab' => 'Quantities',
 		]);
 
 		$formBuilder->add('mbmaxlimit_active', 'Symfony\Component\Form\Extension\Core\Type\CheckboxType', [
 			'label' => $this->l('Enable max limit for this product'),
 			'required' => false,
 			'data' => (bool)$limitData['active'],
+			'form_tab' => 'Quantities',
 		]);
 	}
 
@@ -647,6 +837,7 @@ class Mbmaxlimit extends Module
 
 		$manufacturerId = (int) Db::getInstance()->getValue('SELECT `id_manufacturer` FROM `'._DB_PREFIX_.'product` WHERE id_product='.(int)$idProduct);
 		$categoryIds = array_map('intval', Product::getProductCategories((int)$idProduct));
+		$productFeatures = Product::getFeaturesStatic((int)$idProduct);
 
 		$countryId = 0;
 		if ($idAddressDelivery) {
@@ -668,6 +859,7 @@ class Mbmaxlimit extends Module
 			'categoryIds' => $categoryIds,
 			'countryId' => $countryId,
 			'groupIds' => $groupIds,
+			'productFeatures' => $productFeatures,
 		];
 	}
 
@@ -717,6 +909,14 @@ class Mbmaxlimit extends Module
 				case 'customer_group':
 					$matches = (!empty($groupIds) && in_array((int)$rule['id_target'], array_map('intval', $groupIds), true));
 					break;
+				case 'feature':
+					foreach ($productFeatures as $productFeature) {
+						if ((int)$productFeature['id_feature'] === (int)$rule['id_target']) {
+							$matches = true;
+							break;
+						}
+					}
+					break;
 			}
 			if (!$matches) {
 				continue;
@@ -724,7 +924,7 @@ class Mbmaxlimit extends Module
 
 			$ruleMax = (int) $rule['max_qty'];
 			if ($idCustomer && (int)$rule['lifetime_max_qty'] > 0) {
-				$purchased = $this->getLifetimePurchasedQty($idCustomer, (int)$idProduct, (int)$rule['id_shop']);
+				$purchased = $this->getCustomerPurchasedQty($idCustomer, (int)$idProduct, $rule['time_frame'], (int)$rule['id_shop']);
 				$remaining = max(0, (int)$rule['lifetime_max_qty'] - (int)$purchased);
 				if ($remaining >= 0) {
 					$ruleMax = ($ruleMax > 0) ? min($ruleMax, $remaining) : $remaining;
@@ -739,18 +939,45 @@ class Mbmaxlimit extends Module
 			}
 		}
 
+		// 4. If no other limit was found, apply the global limit as a fallback.
+		if ($bestMax === 0) {
+			$globalMax = (int)Configuration::get('MBMAXLIMIT_GLOBAL_MAX_QTY');
+			if ($globalMax > 0) {
+				$bestMax = $globalMax;
+			}
+		}
+
 		return [
 			'max' => (int) $bestMax,
 			'rule' => $bestRule,
 		];
 	}
 
-	protected function getLifetimePurchasedQty($idCustomer, $idProduct, $idShopFilter = 0)
+	protected function getCustomerPurchasedQty($idCustomer, $idProduct, $timeFrame, $idShopFilter = 0)
 	{
+		// This check works for both registered and guest customers, as PrestaShop creates
+		// a guest account (with an id_customer) once they proceed in the checkout.
 		$sql = 'SELECT SUM(od.product_quantity) FROM `'._DB_PREFIX_.'order_detail` od
 			INNER JOIN `'._DB_PREFIX_.'orders` o ON (o.id_order = od.id_order)
 			INNER JOIN `'._DB_PREFIX_.'order_state` os ON (os.id_order_state = o.current_state)
 			WHERE o.id_customer='.(int)$idCustomer.' AND od.product_id='.(int)$idProduct.' AND os.logable=1';
+
+		switch ($timeFrame) {
+			case 'daily':
+				$sql .= ' AND o.date_add >= DATE_SUB(NOW(), INTERVAL 1 DAY)';
+				break;
+			case 'weekly':
+				$sql .= ' AND o.date_add >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+				break;
+			case 'monthly':
+				$sql .= ' AND o.date_add >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+				break;
+			case 'all_time':
+			default:
+				// No date constraint
+				break;
+		}
+
 		if ($idShopFilter) {
 			$sql .= ' AND o.id_shop='.(int)$idShopFilter;
 		}
@@ -843,6 +1070,111 @@ class Mbmaxlimit extends Module
 		];
 
 		return Db::getInstance()->insert('mbmaxlimit_product', $data, false, true, Db::REPLACE);
+	}
+
+	protected function removeProductLimit($idProduct, $idProductAttribute)
+	{
+		return Db::getInstance()->delete(
+			'mbmaxlimit_product',
+			'`id_product` = '.(int)$idProduct.' AND `id_product_attribute` = '.(int)$idProductAttribute
+		);
+	}
+
+	protected function getProductsInCategories(array $categoryIds)
+	{
+		if (empty($categoryIds)) {
+			return [];
+		}
+
+		$sql = 'SELECT DISTINCT cp.id_product FROM `'._DB_PREFIX_.'category_product` cp WHERE cp.id_category IN ('.implode(',', array_map('intval', $categoryIds)).')';
+
+		$rows = Db::getInstance()->executeS($sql);
+
+		if (!$rows) {
+			return [];
+		}
+
+		return array_column($rows, 'id_product');
+	}
+
+	public function hookActionFrontControllerSetMedia()
+	{
+		if ($this->context->controller->php_self == 'product') {
+			$this->context->controller->registerJavascript(
+				'module-mbmaxlimit-front',
+				$this->_path.'views/js/front.js',
+				['position' => 'bottom', 'priority' => 150]
+			);
+
+			Media::addJsDef([
+				'mbmaxlimit_use_modal' => (bool)Configuration::get('MBMAXLIMIT_USE_MODAL'),
+				'mbmaxlimit_error_pattern' => $this->l('You can add %d more of this item to your cart.'),
+				'mbmaxlimit_error_pattern2' => $this->l('You have reached the purchase limit for this item.'),
+			]);
+		}
+	}
+
+	public function hookDisplayProductAdditionalInfo($params)
+	{
+		if (!Configuration::get('MBMAXLIMIT_SHOW_REMAINING')) {
+			return;
+		}
+
+		$message = $this->getRemainingQuantityMessage($params['product']);
+
+		Media::addJsDef(['mbmaxlimit_init_data' => ['message' => $message]]);
+
+		$this->context->smarty->assign(['mbmaxlimit_message' => $message]);
+		return $this->display(__FILE__, 'views/templates/hook/product_info.tpl');
+	}
+
+	public function hookActionProductRefresh($params)
+    {
+		if (!Configuration::get('MBMAXLIMIT_SHOW_REMAINING')) {
+			return;
+		}
+
+        $product = $params['product'];
+        $message = $this->getRemainingQuantityMessage($product);
+
+		// PrestaShop 1.7.3+ way to add extra content to the refresh result
+        $params['extra_content']['mbmaxlimit_remaining_message'] = $message;
+
+		// PrestaShop 1.7.7+ way is to modify the product array directly
+		if (isset($params['product_details'])) {
+			$params['product_details']['mbmaxlimit_remaining_message'] = $message;
+		}
+    }
+
+	protected function getRemainingQuantityMessage($product)
+	{
+		$id_product = (int)$product['id_product'];
+		$id_product_attribute = (int)$product['id_product_attribute'];
+
+		$limit = $this->computeEffectiveLimit($id_product, $id_product_attribute);
+		$max = (int)$limit['max'];
+
+		if ($max <= 0) {
+			return '';
+		}
+
+		$cart_qty = 0;
+		if ($this->context->cart) {
+			$cart_products = $this->context->cart->getProducts();
+			foreach ($cart_products as $p) {
+				if ($p['id_product'] == $id_product && $p['id_product_attribute'] == $id_product_attribute) {
+					$cart_qty = $p['cart_quantity'];
+					break;
+				}
+			}
+		}
+
+		$remaining = $max - $cart_qty;
+		if ($remaining <= 0) {
+			return $this->l('You have reached the purchase limit for this item.');
+		}
+
+		return sprintf($this->l('You can add %d more of this item to your cart.'), $remaining);
 	}
 }
 
